@@ -21,3 +21,10 @@
     }
   ]
 }
+{
+  "version": 2,
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "dist/index.js" },
+    { "source": "/(.*)", "destination": "dist/public/$1" }
+  ]
+}
