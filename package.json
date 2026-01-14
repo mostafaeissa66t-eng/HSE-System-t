@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "main": "dist/index.js",
   "scripts": {
-    "build": "mkdir -p dist/public && javascript-obfuscator index.js --output dist/index.js && javascript-obfuscator public/app.js --output dist/public/app.js && cp public/index.html dist/public/index.html",
-    "start": "node dist/index.js"
-  },
+  "build": "rm -rf dist && mkdir -p dist/public && javascript-obfuscator index.js --output dist/index.js && javascript-obfuscator public/app.js --output dist/public/app.js && cp public/index.html dist/public/index.html",
+  "start": "node dist/index.js"
+},
   "dependencies": {
     "express": "^5.1.0",
     "node-fetch": "^2.7.0",
