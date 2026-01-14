@@ -1,140 +1,74 @@
-// =================================================================
-// index.js (Final V9 - Fixed 413 Payload Too Large)
-// =================================================================
 const express = require("express");
-const fetch = require("node-fetch"); // Ensure node-fetch@2 is installed
+const fetch = require("node-fetch");
 const path = require("path");
 
 const app = express();
 
-// (*** التعديل هنا: زيادة مساحة الاستقبال إلى 50 ميجا ***)
+// إعدادات استقبال البيانات الكبيرة
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
-// (*** نهاية التعديل ***)
 
-// Serve static files from 'public'
+/** * هام جداً لـ Vercel: 
+ * في بيئة Vercel، المجلد public يتم التعامل معه تلقائياً كـ Static
+ * لكن لضمان عمل الصفحة الرئيسية من السيرفر:
+ */
 app.use(express.static(path.join(__dirname, "public")));
-app.get("/", (req, res) => {
-    const indexPath = path.join(__dirname, "public", "index.html");
-    res.sendFile(indexPath, (err) => {
-        if (err) {
-            console.error("[Startup Error] Error sending index.html:", err);
-            res.status(404).send("Error: index.html not found.");
-        }
-    });
-});
 
-// !!! --- === === === === === === === === === === === === --- !!!
-// !!! --- رابط جوجل آب سكريبت الخاص بك --- !!!
-const GOOGLE_SCRIPT_URL =
-    "https://script.google.com/macros/s/AKfycbwjOXtctSrWZqTPPvfIaGITcFoDTbYeACka_B0AycE32HtYWIJfmilwAwVaRsrgtj-I/exec";
-// !!! --- === === === === === === === === === === === === --- !!!
-
-// Log initial value
-console.log("--- Initial GOOGLE_SCRIPT_URL Check ---");
-console.log("Value:", `"${GOOGLE_SCRIPT_URL}"`);
-// This is the new, safer check:
-const isUrlValid =
-    GOOGLE_SCRIPT_URL &&
-    GOOGLE_SCRIPT_URL.startsWith("https://script.google.com/");
-console.log("Is it a valid Google Script URL?", isUrlValid);
-console.log("--- End Initial Check ---");
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwjOXtctSrWZqTPPvfIaGITcFoDTbYeACka_B0AycE32HtYWIJfmilwAwVaRsrgtj-I/exec";
 
 // API Proxy Endpoint
 app.post("/api", async (req, res) => {
-    console.log("\n--- Received request for /api ---");
     const action = req.body ? req.body.action : "No Action";
-    console.log("Action:", action);
-
-    // --- <<< New Safer Check >>> ---
-    // Re-check the URL validity on every request
-    const isUrlValidOnRequest =
-        GOOGLE_SCRIPT_URL &&
-        GOOGLE_SCRIPT_URL.startsWith("https://script.google.com/");
-    console.log(`Checking URL before fetch: IsUrlValid=${isUrlValidOnRequest}`);
-    // --- <<< End Check >>> ---
-
+    
     try {
-        // If the URL is NOT valid, throw the error
-        if (!isUrlValidOnRequest) {
-            console.error(
-                "FATAL ERROR: GOOGLE_SCRIPT_URL is invalid or not set correctly!",
-            );
-            throw new Error(
-                "Google Script URL is not configured on the server.",
-            );
-        }
         if (!req.body || !action || action === "No Action") {
-            console.error("Error: Request body or action missing.");
             throw new Error("Request body or action is missing.");
         }
 
-        console.log(`Forwarding action "${action}"...`);
-
-        // (ملاحظة: fetch هنا سيرسل البيانات الكبيرة عادي لأننا وسعنا الاستقبال فوق)
         const response = await fetch(GOOGLE_SCRIPT_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(req.body),
             redirect: "follow",
         });
+
         const responseText = await response.text();
+        
         if (!response.ok) {
-            console.error(
-                `Google Script fetch error (${response.status}) for ${action}: ${responseText}`,
-            );
             return res.status(response.status || 500).json({
                 status: "error",
                 message: `GS Error: ${response.statusText}`,
                 details: responseText,
             });
         }
-        let data;
-        try {
-            data = JSON.parse(responseText);
-        } catch (e) {
-            console.error(
-                `JSON Parse Error for ${action}:`,
-                e,
-                "Raw:",
-                responseText,
-            );
-            throw new Error(
-                `Invalid Response: ${responseText.substring(0, 100)}...`,
-            );
-        }
-        console.log(`Received response for ${action}. Status: ${data.status}`);
+
+        const data = JSON.parse(responseText);
         res.json(data);
+
     } catch (error) {
-        console.error("!!! UNEXPECTED Error in /api proxy:", error);
-        if (!res.headersSent) {
-            res.status(500).json({
-                status: "error",
-                message: `Proxy error: ${error.message}`,
-            });
-        }
+        console.error("Proxy error:", error);
+        res.status(500).json({
+            status: "error",
+            message: `Proxy error: ${error.message}`,
+        });
     }
 });
 
-// Start the server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running! Listening on port ${PORT}`);
-    // Final startup check
-    if (!isUrlValid) {
-        console.warn(
-            "************************************************************",
-        );
-        console.warn(
-            "!!! CRITICAL WARNING: GOOGLE_SCRIPT_URL IS NOT SET CORRECTLY !!!",
-        );
-        console.warn(`Current Value: "${GOOGLE_SCRIPT_URL}"`);
-        console.warn("<<< PASTE THE CORRECT URL BETWEEN THE QUOTES >>>");
-        console.warn(
-            "************************************************************",
-        );
-    } else {
-        console.log("GOOGLE_SCRIPT_URL looks valid on startup.");
-        console.log(`Using URL: ${GOOGLE_SCRIPT_URL.substring(0, 40)}...`);
-    }
+// التعامل مع الصفحة الرئيسية
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "index.html"));
 });
+
+/**
+ * التعديل الجوهري لـ Vercel:
+ * لا تستخدم app.listen في الإنتاج (Production)
+ */
+if (process.env.NODE_ENV !== 'production') {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`Server is running locally on port ${PORT}`);
+    });
+}
+
+// تصدير التطبيق ليعمل كـ Serverless Function
+module.exports = app;
